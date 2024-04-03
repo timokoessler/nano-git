@@ -1,5 +1,5 @@
 {
-    "extends": ["eslint:recommended", "oclif", "oclif-typescript", "prettier"],
+    "extends": ["eslint:recommended", "prettier"],
     "rules": {
         "indent": ["off", "tab"],
         "quotes": ["warn", "single"],
