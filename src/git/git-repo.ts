@@ -1,5 +1,6 @@
 import { readFile } from 'fs/promises';
 import { readCompressedFile } from './compression.js';
+import { checkFileExists } from './fs-helpers.js';
 
 export interface Commit {
     sha: string;
@@ -18,6 +19,9 @@ export interface Commit {
     };
 }
 
+/**
+ * Class to interact with a git repository
+ */
 export default class GitRepo {
     private path: string;
 
@@ -25,18 +29,32 @@ export default class GitRepo {
         this.path = path;
     }
 
+    /**
+     * Get the contents of a blob object
+     * @param sha The sha1 hash of the blob object
+     * @returns An object with the header and content of the blob
+     */
     async getBlob(sha: string) {
         const blobPath = `${this.path}/objects/${sha.slice(0, 2)}/${sha.slice(2)}`;
-        const buf = await readCompressedFile(blobPath);
-        const headerEnd = buf.indexOf('\x00');
-        if (headerEnd === -1) {
-            throw new Error('Blob header is malformed');
+        if (await checkFileExists(blobPath)) {
+            const buf = await readCompressedFile(blobPath);
+            const headerEnd = buf.indexOf('\x00');
+            if (headerEnd === -1) {
+                throw new Error('Blob header is malformed');
+            }
+            const header = buf.subarray(0, headerEnd).toString();
+            const content = buf.subarray(headerEnd + 1);
+            return { header, content };
         }
-        const header = buf.subarray(0, headerEnd).toString();
-        const content = buf.subarray(headerEnd + 1);
-        return { header, content };
+        // Todo: Check if it's a packed object
+        throw new Error(`No object found with sha ${sha}, Packfiles are not supported yet`);
     }
 
+    /**
+     * Get a commit object from the repository
+     * @param sha The sha1 hash of the commit object
+     * @returns The commit object
+     */
     async getCommit(sha: string): Promise<Commit> {
         const blob = await this.getBlob(sha);
         if (!blob.header.startsWith('commit')) {
@@ -86,6 +104,11 @@ export default class GitRepo {
         return { sha, tree, parents, message, author, committer };
     }
 
+    /**
+     * Get the entries of a tree object
+     * @param sha The sha1 hash of the tree object
+     * @returns An array of objects with the mode, name and sha1 hash of the tree entries
+     */
     async getTree(sha: string) {
         const blob = await this.getBlob(sha);
         if (!blob.header.startsWith('tree')) {
@@ -93,22 +116,43 @@ export default class GitRepo {
         }
         const lines = blob.content.toString().split('\n');
         const entries = lines.map((line) => {
-            const [mode, name, sha] = line.split(' ');
-            return { mode, name, sha };
+            const [mode, type, name, sha] = line.split(' ');
+            return { mode, type, name, sha };
         });
         return entries;
     }
 
     /**
+     * Get a reference (e.g. branch or tag) from the repository
+     * @param ref The type and name of the reference e.g. heads/main, tags/v1.0.0
+     * @returns The sha1 hash of the reference
+     */
+    async getRef(ref: string) {
+        const refPath = `${this.path}/refs/${ref}`;
+        // Check if file exists
+        if (await checkFileExists(refPath)) {
+            return (await readFile(refPath)).toString().trim();
+        }
+        // Check if it's a packed ref
+        const packedRefs = (await readFile(`${this.path}/packed-refs`)).toString();
+        const line = packedRefs.split('\n').find((line) => line.endsWith(`refs/${ref}`));
+        if (line !== undefined) {
+            return line.split(' ')[0];
+        }
+        throw new Error(`Ref ${ref} not found`);
+    }
+
+    /**
      * Get the sha1 hash of the commit that the branch points to
+     * A convenience method that calls getRef with the correct prefix
      * @param name Name of the branch e.g. main
      * @returns The sha1 hash of the commit that the branch points to
      */
     async getBranch(name: string) {
-        const refPath = `${this.path}/refs/heads/${name}`;
-        return (await readFile(refPath)).toString().trim();
+        return this.getRef(`heads/${name}`);
     }
 
+    // Todo: Support more types of references and detached HEAD
     async getHead() {
         const content = (await readFile(`${this.path}/HEAD`)).toString().trim();
         if (content.startsWith('ref: refs/heads/')) {
