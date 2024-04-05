@@ -123,6 +123,27 @@ export default class GitRepo {
     }
 
     /**
+     * Read packfile index
+     */
+    async readPackIndex(sha: string) {
+        const indexFile = `${this.path}/objects/pack/pack-${sha}.idx`;
+        if (await checkFileExists(indexFile)) {
+            const buf = await readFile(indexFile);
+            const header = buf.subarray(0, 4).toString('hex');
+            // Magic number for pack index file \377tOc
+            if (header !== 'ff744f63') {
+                throw new Error('Invalid pack index file');
+            }
+            const version = buf.readUInt32BE(4);
+            if (version !== 2) {
+                throw new Error('Unsupported pack index version. Only version 2 is supported.');
+            }
+            // Todo
+        }
+        throw new Error(`Pack index file ${indexFile} not found`);
+    }
+
+    /**
      * Get a reference (e.g. branch or tag) from the repository
      * @param ref The type and name of the reference e.g. heads/main, tags/v1.0.0
      * @returns The sha1 hash of the reference

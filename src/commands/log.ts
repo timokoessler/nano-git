@@ -1,5 +1,4 @@
 import { Command } from '@oclif/core';
-
 import { findGitFolder } from '../git/fs-helpers.js';
 import GitRepo, { Commit } from '../git/git-repo.js';
 
