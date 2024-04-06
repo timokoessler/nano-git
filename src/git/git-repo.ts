@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import { readCompressedFile } from './compression.js';
 import { checkFileExists } from './fs-helpers.js';
+import { findObjectInPackIndex } from './pack.js';
 
 export interface Commit {
     sha: string;
@@ -129,61 +130,12 @@ export default class GitRepo {
      * @param sha The sha1 hash of the object to find
      */
     async getObjectFromPack(packSha: string, sha: string) {
-        const indexFile = `${this.path}/objects/pack/pack-${packSha}.idx`;
-        if (!(await checkFileExists(indexFile))) {
-            throw new Error(`Pack index file ${indexFile} not found`);
+        const indexInfo = await findObjectInPackIndex(this.path, packSha, sha);
+        if (indexInfo === null) {
+            throw new Error(`Object ${sha} not found in pack ${packSha}`);
         }
-        const buf = await readFile(indexFile);
-        const header = buf.subarray(0, 4).toString('hex');
-        // Magic number for pack index file \377tOc
-        if (header !== 'ff744f63') {
-            throw new Error('Invalid pack index file');
-        }
-        const version = buf.readUInt32BE(4);
-        if (version !== 2) {
-            throw new Error('Unsupported pack index version. Only version 2 is supported.');
-        }
-        let offset = 8; // 4 bytes for header, 4 bytes for version
-
-        // Read fan-out table
-        // The fan-out table is a table of 256 4-byte entries, one for each possible byte value
-        // The n-th entry is the number of objects in the packfile that start with a byte value of n or less
-        const fanoutTable: number[] = [];
-        for (let i = 0; i < 256; i++) {
-            const count = buf.readUInt32BE(offset);
-            fanoutTable.push(count);
-            offset += 4;
-        }
-
-        const prefixNumber = parseInt(sha.substring(0, 2), 16);
-        const sha1Length = 20; // bytes
-
-        // Determine the start position in the packfile based on the fan-out table
-        let startOffset = offset + (prefixNumber > 0 ? fanoutTable[prefixNumber - 1] : 0) * sha1Length;
-        //let endOffset = offset + fanoutTable[prefixNumber] * sha1Length;
-        // Todo test
-        let endOffset = offset + (fanoutTable[prefixNumber] + 6) * sha1Length;
-
-        // Binary search the pack index to find the sha
-        while (startOffset < endOffset) {
-            const mid = startOffset + Math.floor((endOffset - startOffset) / sha1Length / 2) * sha1Length;
-            const midSha = buf.subarray(mid, mid + sha1Length).toString('hex');
-            if (midSha < sha) {
-                startOffset = mid + sha1Length;
-            } else if (midSha > sha) {
-                endOffset = mid;
-            } else {
-                // Found the sha
-                break;
-            }
-        }
-        if (startOffset >= endOffset) {
-            return null;
-        }
-        console.log(startOffset, endOffset);
-        console.log(buf.subarray(startOffset, endOffset).toString('hex'));
-
-        // 67577c0763d0129c9be3d6dc403119656bf2efb5
+        console.log(indexInfo);
+        // Todo: Read object from packfile
     }
 
     /**
