@@ -178,7 +178,14 @@ export default class GitRepo {
                 commit: await this.getBranch(content.slice(16)),
             };
         }
-        throw new Error('HEAD is not a branch (currently not supported)');
+        if (content.startsWith('ref: refs/tags/')) {
+            return {
+                type: 'tag',
+                name: content.slice(15),
+                commit: await this.getRef(content.slice(5)),
+            };
+        }
+        throw new Error('HEAD does not point to a branch or tag. This is not supported yet');
     }
 
     getPath() {
