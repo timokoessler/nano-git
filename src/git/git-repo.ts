@@ -1,7 +1,7 @@
 import { readFile } from 'fs/promises';
 import { readCompressedFile } from './compression.js';
 import { checkFileExists } from './fs-helpers.js';
-import { findObjectInPackIndex } from './pack.js';
+import { findObjectInPackIndex, getObjectFromPack } from './pack.js';
 
 export interface Commit {
     sha: string;
@@ -134,8 +134,8 @@ export default class GitRepo {
         if (indexInfo === null) {
             throw new Error(`Object ${sha} not found in pack ${packSha}`);
         }
-        console.log(indexInfo);
-        // Todo: Read object from packfile
+        const object = await getObjectFromPack(this.path, packSha, indexInfo);
+        // Todo
     }
 
     /**

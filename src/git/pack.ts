@@ -72,3 +72,53 @@ export async function findObjectInPackIndex(repoPath: string, packSha: string, s
         dataOffset,
     };
 }
+
+export async function getObjectFromPack(repoPath: string, packSha: string, index: { crc32Checksum: number; dataOffset: number }) {
+    const packFile = `${repoPath}/objects/pack/pack-${packSha}.pack`;
+    if (!(await checkFileExists(packFile))) {
+        throw new Error(`Pack file ${packFile} not found`);
+    }
+    const buf = await readFile(packFile);
+    if (buf.subarray(0, 4).toString() !== 'PACK') {
+        throw new Error('Invalid pack file. Header does not starts with "PACK"');
+    }
+    const version = buf.readUInt32BE(4);
+    if (version !== 2) {
+        throw new Error('Unsupported pack file version. Only version 2 is supported.');
+    }
+    const objectCount = buf.readUInt32BE(8);
+
+    const parseVarSize = (startOffset: number) => {
+        let result = 0;
+        let shift = 4;
+        result = buf.readUint8(startOffset) & 15;
+        while (true) {
+            const byte = buf.readUint8(++startOffset);
+            result |= (byte & 0x7f) << shift;
+            if ((byte & 0x80) === 0) {
+                break;
+            }
+            shift += 7;
+        }
+
+        return result;
+    };
+
+    let offset = 12; // 4 bytes for header, 4 bytes for version, 4 bytes for object count
+    for (let i = 0; i < objectCount; i++) {
+        console.log(`Object ${i + 1} at offset ${offset}`);
+        const typeAndSize = buf.readUInt8(offset);
+        // Second to fourth bits are the type, so we shift the byte 4 bits to the right and then mask the result with 0x07 to ignore the first bit
+        const type = (typeAndSize >> 4) & 7;
+        if (type <= 0 || type > 7) {
+            throw new Error(`Invalid object type ${type} in pack file`);
+        }
+        console.log(`Type: ${type}`);
+        let size = parseVarSize(offset);
+        console.log(`Size: ${size}`);
+
+        // Todo fix size is not the size of the compressed object
+
+        offset += size;
+    }
+}
