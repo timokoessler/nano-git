@@ -134,8 +134,7 @@ export default class GitRepo {
         if (indexInfo === null) {
             throw new Error(`Object ${sha} not found in pack ${packSha}`);
         }
-        const object = await getObjectFromPack(this.path, packSha, indexInfo);
-        // Todo
+        return await getObjectFromPack(this.path, packSha, indexInfo);
     }
 
     /**

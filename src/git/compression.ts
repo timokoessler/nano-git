@@ -7,3 +7,7 @@ export async function readCompressedFile(filePath: string): Promise<Buffer> {
     const fileContent = await readFile(filePath);
     return await inflate(fileContent);
 }
+
+export async function decompressObject(data: Buffer): Promise<Buffer> {
+    return await inflate(data);
+}

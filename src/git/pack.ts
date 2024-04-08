@@ -1,5 +1,7 @@
 import { readFile } from 'fs/promises';
 import { checkFileExists } from './fs-helpers.js';
+import { numToObjType } from './object.js';
+import { decompressObject } from './compression.js';
 
 export async function findObjectInPackIndex(repoPath: string, packSha: string, sha: string) {
     const indexFile = `${repoPath}/objects/pack/pack-${packSha}.idx`;
@@ -86,14 +88,16 @@ export async function getObjectFromPack(repoPath: string, packSha: string, index
     if (version !== 2) {
         throw new Error('Unsupported pack file version. Only version 2 is supported.');
     }
-    const objectCount = buf.readUInt32BE(8);
+    // const objectCount = buf.readUInt32BE(8);
 
     const parseVarSize = (startOffset: number) => {
         let result = 0;
         let shift = 4;
+        let length = 1;
         result = buf.readUint8(startOffset) & 15;
         while (true) {
             const byte = buf.readUint8(++startOffset);
+            length++;
             result |= (byte & 0x7f) << shift;
             if ((byte & 0x80) === 0) {
                 break;
@@ -101,24 +105,22 @@ export async function getObjectFromPack(repoPath: string, packSha: string, index
             shift += 7;
         }
 
-        return result;
+        return { size: result, typeAndSizeLength: length };
     };
 
-    let offset = 12; // 4 bytes for header, 4 bytes for version, 4 bytes for object count
-    for (let i = 0; i < objectCount; i++) {
-        console.log(`Object ${i + 1} at offset ${offset}`);
-        const typeAndSize = buf.readUInt8(offset);
-        // Second to fourth bits are the type, so we shift the byte 4 bits to the right and then mask the result with 0x07 to ignore the first bit
-        const type = (typeAndSize >> 4) & 7;
-        if (type <= 0 || type > 7) {
-            throw new Error(`Invalid object type ${type} in pack file`);
-        }
-        console.log(`Type: ${type}`);
-        let size = parseVarSize(offset);
-        console.log(`Size: ${size}`);
-
-        // Todo fix size is not the size of the compressed object
-
-        offset += size;
+    const typeAndSize = buf.readUInt8(index.dataOffset);
+    // Second to fourth bits are the type, so we shift the byte 4 bits to the right and then mask the result with 0x07 to ignore the first bit
+    const type = (typeAndSize >> 4) & 7;
+    if (type <= 0 || type > 7) {
+        throw new Error(`Invalid object type ${type} in pack file`);
     }
+    console.log(`Type: ${type}`);
+    const { size, typeAndSizeLength } = parseVarSize(index.dataOffset);
+    console.log(`Size: ${size}`);
+
+    return {
+        type: numToObjType(type),
+        size,
+        data: await decompressObject(buf.subarray(index.dataOffset + typeAndSizeLength)),
+    };
 }
