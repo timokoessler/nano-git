@@ -2,6 +2,7 @@ import { readFile } from 'fs/promises';
 import { readCompressedFile } from './compression.js';
 import { checkFileExists } from './fs-helpers.js';
 import { findObjectInPackIndex, getObjectFromPack } from './pack.js';
+import { getObject } from './object.js';
 
 export interface Commit {
     sha: string;
@@ -36,19 +37,7 @@ export default class GitRepo {
      * @returns An object with the header and content of the blob
      */
     async getBlob(sha: string) {
-        const blobPath = `${this.path}/objects/${sha.slice(0, 2)}/${sha.slice(2)}`;
-        if (await checkFileExists(blobPath)) {
-            const buf = await readCompressedFile(blobPath);
-            const headerEnd = buf.indexOf('\x00');
-            if (headerEnd === -1) {
-                throw new Error('Blob header is malformed');
-            }
-            const header = buf.subarray(0, headerEnd).toString();
-            const content = buf.subarray(headerEnd + 1);
-            return { header, content };
-        }
-        // Todo: Check if it's a packed object
-        throw new Error(`No object found with sha ${sha}, Packfiles are not supported yet`);
+        return await getObject(this.path, sha);
     }
 
     /**
@@ -57,7 +46,7 @@ export default class GitRepo {
      * @returns The commit object
      */
     async getCommit(sha: string): Promise<Commit> {
-        const blob = await this.getBlob(sha);
+        const blob = await getObject(this.path, sha);
         if (!blob.header.startsWith('commit')) {
             throw new Error('Object is not a commit');
         }
@@ -111,7 +100,7 @@ export default class GitRepo {
      * @returns An array of objects with the mode, name and sha1 hash of the tree entries
      */
     async getTree(sha: string) {
-        const blob = await this.getBlob(sha);
+        const blob = await getObject(this.path, sha);
         if (!blob.header.startsWith('tree')) {
             throw new Error('Object is not a tree');
         }

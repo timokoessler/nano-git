@@ -1,4 +1,4 @@
-import { readFile } from 'fs/promises';
+import { readFile, readdir } from 'fs/promises';
 import { checkFileExists } from './fs-helpers.js';
 import { numToObjType } from './object.js';
 import { decompressObject } from './compression.js';
@@ -114,13 +114,29 @@ export async function getObjectFromPack(repoPath: string, packSha: string, index
     if (type <= 0 || type > 7) {
         throw new Error(`Invalid object type ${type} in pack file`);
     }
-    console.log(`Type: ${type}`);
     const { size, typeAndSizeLength } = parseVarSize(index.dataOffset);
-    console.log(`Size: ${size}`);
 
     return {
         type: numToObjType(type),
         size,
         data: await decompressObject(buf.subarray(index.dataOffset + typeAndSizeLength)),
     };
+}
+
+async function getAllPackFileNames(repoPath: string) {
+    const packDir = `${repoPath}/objects/pack`;
+    const files = await readdir(packDir);
+    return files.filter((file) => file.endsWith('.pack'));
+}
+
+export async function getObjectFromAnyPack(repoPath: string, sha: string) {
+    const packFiles = await getAllPackFileNames(repoPath);
+    for (const packFile of packFiles) {
+        const packSha = packFile.split('-')[1].split('.')[0];
+        const indexInfo = await findObjectInPackIndex(repoPath, packSha, sha);
+        if (indexInfo !== null) {
+            return await getObjectFromPack(repoPath, packSha, indexInfo);
+        }
+    }
+    return null;
 }
