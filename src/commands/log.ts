@@ -1,51 +1,44 @@
-import { Command } from '@oclif/core';
+import { error, log } from 'console';
 import { findGitFolder } from '../git/fs-helpers.js';
 import GitRepo, { Commit } from '../git/git-repo.js';
 
-export default class Log extends Command {
-    static args = {};
-    static description = 'Show commit log';
-    static examples = ['$ ngit log'];
-    static flags = {};
+function printCommit(commit: Commit) {
+    log(`commit ${commit.sha}`);
+    log(`Author: ${commit.author.name} <${commit.author.email}>`);
+    log(`Committer: ${commit.committer.name} <${commit.committer.email}>`);
+    log(`Date: ${commit.committer.date.toLocaleString()}`);
+    log('');
+    log(`    ${commit.message}`);
+    log('');
+}
 
-    private async printCommit(commit: Commit) {
-        this.log(`commit ${commit.sha}`);
-        this.log(`Author: ${commit.author.name} <${commit.author.email}>`);
-        this.log(`Committer: ${commit.committer.name} <${commit.committer.email}>`);
-        this.log(`Date: ${commit.committer.date.toLocaleString()}`);
-        this.log('');
-        this.log(`    ${commit.message}`);
-        this.log('');
+export async function logCommand() {
+    const folder = await findGitFolder();
+    if (folder === undefined) {
+        error('Not a git repository', { exit: 1 });
+    }
+    log(`Found git repository at ${folder}`);
+    const repo = new GitRepo(folder);
+
+    const head = await repo.getHead();
+    if (head.type !== 'branch') {
+        error('HEAD does not point to a branch. This is not supported yet.', { exit: 1 });
     }
 
-    async run(): Promise<void> {
-        const folder = await findGitFolder();
-        if (folder === undefined) {
-            this.error('Not a git repository', { exit: 1 });
+    const commits = [];
+    commits.push(await repo.getCommit(head.commit));
+
+    while (commits.length > 0) {
+        const commit = commits.pop();
+        if (commit === undefined) {
+            break;
         }
-        this.log(`Found git repository at ${folder}`);
-        const repo = new GitRepo(folder);
-
-        const head = await repo.getHead();
-        if (head.type !== 'branch') {
-            this.error('HEAD does not point to a branch. This is not supported yet.', { exit: 1 });
+        await printCommit(commit);
+        for (const parent of commit.parents) {
+            commits.push(await repo.getCommit(parent));
         }
-
-        const commits = [];
-        commits.push(await repo.getCommit(head.commit));
-
-        while (commits.length > 0) {
-            const commit = commits.pop();
-            if (commit === undefined) {
-                break;
-            }
-            await this.printCommit(commit);
-            for (const parent of commit.parents) {
-                commits.push(await repo.getCommit(parent));
-            }
-            if (commits.length > 0) {
-                commits.sort((a, b) => a.author.date.getTime() - b.author.date.getTime());
-            }
+        if (commits.length > 0) {
+            commits.sort((a, b) => a.author.date.getTime() - b.author.date.getTime());
         }
     }
 }

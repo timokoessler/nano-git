@@ -12,62 +12,34 @@
     "license": "MIT",
     "author": "Timo Kössler",
     "type": "module",
-    "exports": "./lib/index.js",
-    "types": "dist/index.d.ts",
     "bin": {
-        "ngit": "./bin/run.js"
+        "ngit": "./dist/cli.cjs"
     },
-    "files": [
-        "/bin",
-        "/dist",
-        "/oclif.manifest.json"
-    ],
     "scripts": {
-        "build": "shx rm -rf dist && tsc -b",
+        "build": "tsup && pkg .",
+        "dev": "tsx ./src/cli.ts",
         "lint": "eslint . --ext .ts",
         "format": "prettier --write .",
-        "prepack": "npm run build && oclif manifest && oclif readme",
-        "postpack": "shx rm -f oclif.manifest.json",
-        "prepare": "npm run build",
-        "test": "mocha --forbid-only \"test/**/*.test.ts\"",
-        "posttest": "npm run lint",
-        "version": "oclif readme && git add README.md"
+        "test": "mocha --forbid-only \"test/**/*.test.ts\""
     },
-    "oclif": {
-        "bin": "ngit",
-        "commands": "./dist/commands",
-        "dirname": "ngit",
-        "plugins": [
-            "@oclif/plugin-help",
-            "@oclif/plugin-plugins"
+    "pkg": {
+        "targets": [
+            "node20-linux-x64",
+            "node20-win-x64"
         ],
-        "topicSeparator": " ",
-        "topics": {
-            "hello": {
-                "description": "Say hello to the world and others"
-            }
-        }
-    },
-    "dependencies": {
-        "@oclif/core": "^3",
-        "@oclif/plugin-help": "^6"
+        "outputPath": "dist"
     },
     "devDependencies": {
-        "@oclif/prettier-config": "^0.2.1",
-        "@oclif/test": "^3",
-        "@types/chai": "^4",
-        "@types/mocha": "^10",
         "@types/node": "^20.12.2",
-        "chai": "^4.4.1",
+        "@typescript-eslint/eslint-plugin": "^7.6.0",
+        "@typescript-eslint/parser": "^7.6.0",
+        "@yao-pkg/pkg": "^5.11.5",
+        "commander": "^12.0.0",
         "eslint": "^8",
-        "eslint-config-oclif": "^5",
-        "eslint-config-oclif-typescript": "^3",
         "eslint-config-prettier": "^9.1.0",
-        "mocha": "^10",
-        "oclif": "^4.7.3",
         "prettier": "^3.2.5",
-        "shx": "^0.3.4",
-        "ts-node": "^10.9.2",
+        "tsup": "^8.0.2",
+        "tsx": "^4.7.2",
         "typescript": "5.3"
     },
     "engines": {

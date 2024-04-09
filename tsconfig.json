@@ -1,14 +1,16 @@
 {
     "compilerOptions": {
-        "declaration": true,
-        "module": "Node16",
+        "allowSyntheticDefaultImports": true,
+        "target": "ES2022",
+        "moduleResolution": "Node",
         "outDir": "dist",
-        "rootDir": "src",
-        "strict": true,
-        "target": "es2022",
-        "moduleResolution": "node16",
-        "composite": true
+        "module": "CommonJS",
+        "esModuleInterop": true,
+        "strict": false,
+        "checkJs": true,
+        "resolveJsonModule": true
     },
+    "exclude": ["node_modules/"],
     "include": ["./src/**/*"],
     "ts-node": {
         "esm": true
