@@ -24,6 +24,55 @@ export async function getObject(repoPath: string, sha: string) {
     };
 }
 
+export async function getCommit(repoPath: string, sha: string) {
+    const blob = await getObject(repoPath, sha);
+    if (!blob.header.startsWith('commit')) {
+        throw new Error('Object is not a commit');
+    }
+    const lines = blob.content.toString().split('\n');
+
+    const tree = lines.find((line) => line.startsWith('tree'))?.split(' ')[1];
+    if (tree === undefined) {
+        throw new Error('Commit does not have a tree');
+    }
+    let parents = lines.filter((line) => line.startsWith('parent')).map((line) => line.split(' ')[1]);
+    if (!Array.isArray(parents)) {
+        parents = [];
+    }
+
+    const parseUserDateLine = (line: string) => {
+        const parts = line.split(' ');
+        const user = parts.slice(1, -2);
+        const email = user.pop()?.slice(1, -1);
+        if (email === undefined) {
+            throw new Error('Commit does not have an email');
+        }
+        const name = user.join(' ');
+
+        const timestamp = parseInt(parts[parts.length - 2]);
+        const date = new Date(timestamp * 1000);
+
+        return { date, name, email };
+    };
+
+    const authorLine = lines.find((line) => line.startsWith('author'));
+    if (authorLine === undefined) {
+        throw new Error('Commit does not have an author');
+    }
+
+    const committerLine = lines.find((line) => line.startsWith('committer'));
+    if (committerLine === undefined) {
+        throw new Error('Commit does not have a committer');
+    }
+
+    const author = parseUserDateLine(authorLine);
+    const committer = parseUserDateLine(committerLine);
+    const messageStart = lines.findIndex((line) => line === '') + 1;
+    const message = lines.slice(messageStart).join('\n');
+
+    return { sha, tree, parents, message, author, committer };
+}
+
 export function numToObjType(type: number) {
     switch (type) {
         case 1:

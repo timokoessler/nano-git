@@ -13,6 +13,8 @@ export async function statusCommand() {
 
     log(`On ${head.type} ${head.name}`);
 
+    // log(await repo.getIndex());
+
     // Todo print:
     // - Is up to date with remote
     // - Changes to be committed

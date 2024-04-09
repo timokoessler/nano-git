@@ -95,6 +95,7 @@ export async function getObjectFromPack(repoPath: string, packSha: string, index
         let shift = 4;
         let length = 1;
         result = buf.readUint8(startOffset) & 15;
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             const byte = buf.readUint8(++startOffset);
             length++;
@@ -114,6 +115,12 @@ export async function getObjectFromPack(repoPath: string, packSha: string, index
     if (type <= 0 || type > 7) {
         throw new Error(`Invalid object type ${type} in pack file`);
     }
+
+    if (type === 6 || type === 7) {
+        // Todo: Implement
+        throw new Error('Delta objects are not supported yet');
+    }
+
     const { size, typeAndSizeLength } = parseVarSize(index.dataOffset);
 
     return {

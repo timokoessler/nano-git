@@ -1,8 +1,7 @@
 import { readFile } from 'fs/promises';
-import { readCompressedFile } from './compression.js';
 import { checkFileExists } from './fs-helpers.js';
-import { findObjectInPackIndex, getObjectFromPack } from './pack.js';
-import { getObject } from './object.js';
+import { getCommit, getObject } from './object.js';
+import { parseIndexFile } from './staging.js';
 
 export interface Commit {
     sha: string;
@@ -46,52 +45,7 @@ export default class GitRepo {
      * @returns The commit object
      */
     async getCommit(sha: string): Promise<Commit> {
-        const blob = await getObject(this.path, sha);
-        if (!blob.header.startsWith('commit')) {
-            throw new Error('Object is not a commit');
-        }
-        const lines = blob.content.toString().split('\n');
-
-        const tree = lines.find((line) => line.startsWith('tree'))?.split(' ')[1];
-        if (tree === undefined) {
-            throw new Error('Commit does not have a tree');
-        }
-        let parents = lines.filter((line) => line.startsWith('parent')).map((line) => line.split(' ')[1]);
-        if (!Array.isArray(parents)) {
-            parents = [];
-        }
-
-        const parseUserDateLine = (line: string) => {
-            const parts = line.split(' ');
-            const user = parts.slice(1, -2);
-            const email = user.pop()?.slice(1, -1);
-            if (email === undefined) {
-                throw new Error('Commit does not have an email');
-            }
-            const name = user.join(' ');
-
-            const timestamp = parseInt(parts[parts.length - 2]);
-            const date = new Date(timestamp * 1000);
-
-            return { date, name, email };
-        };
-
-        const authorLine = lines.find((line) => line.startsWith('author'));
-        if (authorLine === undefined) {
-            throw new Error('Commit does not have an author');
-        }
-
-        const committerLine = lines.find((line) => line.startsWith('committer'));
-        if (committerLine === undefined) {
-            throw new Error('Commit does not have a committer');
-        }
-
-        const author = parseUserDateLine(authorLine);
-        const committer = parseUserDateLine(committerLine);
-        const messageStart = lines.findIndex((line) => line === '') + 1;
-        const message = lines.slice(messageStart).join('\n');
-
-        return { sha, tree, parents, message, author, committer };
+        return await getCommit(this.path, sha);
     }
 
     /**
@@ -113,17 +67,11 @@ export default class GitRepo {
     }
 
     /**
-     * Read packfile index
-     * https://git-scm.com/docs/pack-format
-     * @param packSha The sha1 hash of the packfile
-     * @param sha The sha1 hash of the object to find
+     * Get the index of the repository
+     * @returns Todo: Add return type
      */
-    async getObjectFromPack(packSha: string, sha: string) {
-        const indexInfo = await findObjectInPackIndex(this.path, packSha, sha);
-        if (indexInfo === null) {
-            throw new Error(`Object ${sha} not found in pack ${packSha}`);
-        }
-        return await getObjectFromPack(this.path, packSha, indexInfo);
+    async getIndex() {
+        return await parseIndexFile(this.path);
     }
 
     /**
