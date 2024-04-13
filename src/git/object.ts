@@ -1,6 +1,10 @@
+import { createHash } from 'crypto';
 import { readCompressedFile } from './compression.js';
 import { checkFileExists } from './fs-helpers.js';
 import { getObjectFromAnyPack } from './pack.js';
+
+export type GitObjectType = 'commit' | 'tree' | 'blob' | 'tag';
+export const gitObjectTypes = ['commit', 'tree', 'blob', 'tag'];
 
 export async function getObject(repoPath: string, sha: string) {
     const blobPath = `${repoPath}/objects/${sha.slice(0, 2)}/${sha.slice(2)}`;
@@ -93,4 +97,20 @@ export function numToObjType(type: number) {
         default:
             throw new Error(`Unknown object type ${type}`);
     }
+}
+
+/**
+ * Get the sha1 hash of an file
+ * @param type The type of the object
+ * @param content The content of the object as a buffer
+ * @returns The sha1 hash of the object
+ */
+export function hashObject(type: GitObjectType, content: Buffer | string) {
+    let length: number;
+    if (Buffer.isBuffer(content)) {
+        length = content.length;
+    } else {
+        length = Buffer.byteLength(content);
+    }
+    return createHash('sha1').update(`${type} ${length}\x00`).update(content).digest('hex');
 }
