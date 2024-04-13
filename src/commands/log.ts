@@ -1,6 +1,7 @@
 import { error, log } from 'console';
 import { findGitFolder } from '../git/fs-helpers.js';
 import GitRepo, { Commit } from '../git/git-repo.js';
+import { exit } from 'process';
 
 function printCommit(commit: Commit) {
     log(`commit ${commit.sha}`);
@@ -15,15 +16,13 @@ function printCommit(commit: Commit) {
 export async function logCommand() {
     const folder = await findGitFolder();
     if (folder === undefined) {
-        error('Not a git repository', { exit: 1 });
+        error('Not a git repository');
+        exit(1);
     }
     log(`Found git repository at ${folder}`);
     const repo = new GitRepo(folder);
 
     const head = await repo.getHead();
-    if (head.type !== 'branch') {
-        error('HEAD does not point to a branch. This is not supported yet.', { exit: 1 });
-    }
 
     const commits = [];
     commits.push(await repo.getCommit(head.commit));

@@ -31,11 +31,11 @@ export default class GitRepo {
     }
 
     /**
-     * Get the contents of a blob object
-     * @param sha The sha1 hash of the blob object
-     * @returns An object with the header and content of the blob
+     * Get the contents of a object
+     * @param sha The sha1 hash of the object
+     * @returns An object with the header, content and type of the object
      */
-    async getBlob(sha: string) {
+    async getObject(sha: string) {
         return await getObject(this.path, sha);
     }
 
@@ -54,11 +54,11 @@ export default class GitRepo {
      * @returns An array of objects with the mode, name and sha1 hash of the tree entries
      */
     async getTree(sha: string) {
-        const blob = await getObject(this.path, sha);
-        if (!blob.header.startsWith('tree')) {
+        const obj = await getObject(this.path, sha);
+        if (obj.type !== 'tree') {
             throw new Error('Object is not a tree');
         }
-        const lines = blob.content.toString().split('\n');
+        const lines = obj.content.toString().split('\n');
         const entries = lines.map((line) => {
             const [mode, type, name, sha] = line.split(' ');
             return { mode, type, name, sha };

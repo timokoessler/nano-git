@@ -12,7 +12,7 @@ export async function getObject(repoPath: string, sha: string) {
         }
         const header = buf.subarray(0, headerEnd).toString();
         const content = buf.subarray(headerEnd + 1);
-        return { header, content };
+        return { header, content, type: header.split(' ')[0] };
     }
     const packObject = await getObjectFromAnyPack(repoPath, sha);
     if (packObject === null) {
@@ -21,15 +21,16 @@ export async function getObject(repoPath: string, sha: string) {
     return {
         header: `${packObject.type} ${packObject.size}\x00`,
         content: packObject.data,
+        type: packObject.type,
     };
 }
 
 export async function getCommit(repoPath: string, sha: string) {
-    const blob = await getObject(repoPath, sha);
-    if (!blob.header.startsWith('commit')) {
+    const obj = await getObject(repoPath, sha);
+    if (obj.type !== 'commit') {
         throw new Error('Object is not a commit');
     }
-    const lines = blob.content.toString().split('\n');
+    const lines = obj.content.toString().split('\n');
 
     const tree = lines.find((line) => line.startsWith('tree'))?.split(' ')[1];
     if (tree === undefined) {
