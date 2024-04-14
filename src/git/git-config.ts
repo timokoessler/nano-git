@@ -7,6 +7,7 @@ export type GitConfig = Record<string, string> & {
     'user.email'?: string;
     'commit.gpgsign'?: 'true' | 'false';
     'init.defaultBranch'?: string;
+    'core.ignorecase'?: 'true' | 'false';
 };
 
 /**

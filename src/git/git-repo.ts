@@ -3,6 +3,7 @@ import { checkFileExists } from './fs-helpers.js';
 import { GitObjectType, getCommit, getObject, hashObject, writeObject } from './object.js';
 import { parseIndexFile } from './staging.js';
 import { GitConfig, readMergedGitConfig } from './git-config.js';
+import { GitIgnoreParser } from './git-ignore.js';
 
 /**
  * Class to interact with a git repository
@@ -10,6 +11,7 @@ import { GitConfig, readMergedGitConfig } from './git-config.js';
 export default class GitRepo {
     private path: string;
     private config: GitConfig;
+    private gitignore: GitIgnoreParser;
 
     constructor(path: string) {
         this.path = path;
@@ -150,5 +152,19 @@ export default class GitRepo {
      */
     async writeObject(type: GitObjectType, content: Buffer, fileName = '', filters = true) {
         return await writeObject(this.path, type, content, await this.getConfig(), fileName, filters);
+    }
+
+    /**
+     * Get the gitignore parser
+     * If the parser has not been initialized yet, it will be initialized
+     * @returns A instance of the GitIgnoreParser
+     */
+    async getGitIgnoreParser() {
+        if (this.gitignore === undefined) {
+            const config = await this.getConfig();
+            this.gitignore = new GitIgnoreParser(this.path, config['core.ignorecase'] === 'true');
+            await this.gitignore.init();
+        }
+        return this.gitignore;
     }
 }

@@ -1,7 +1,8 @@
 import { error, log } from 'console';
 import { findGitFolder } from '../git/fs-helpers.js';
-import GitRepo, { Commit } from '../git/git-repo.js';
+import GitRepo from '../git/git-repo.js';
 import { exit } from 'process';
+import { Commit } from '../git/object.js';
 
 function printCommit(commit: Commit) {
     log(`commit ${commit.sha}`);
@@ -32,7 +33,7 @@ export async function logCommand() {
         if (commit === undefined) {
             break;
         }
-        await printCommit(commit);
+        printCommit(commit);
         for (const parent of commit.parents) {
             commits.push(await repo.getCommit(parent));
         }
