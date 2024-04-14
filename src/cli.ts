@@ -23,6 +23,7 @@ program
     .argument('<file>', 'The path to the file to hash')
     .option('-t, --type <type>', 'Specify the type', 'blob')
     .option('--no-filters', 'Do not normalize line endings (default)')
+    .option('-w, --write', 'Actually write the object into the database')
     .action(hashObjectCommand);
 
 program.parse();

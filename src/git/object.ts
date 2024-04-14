@@ -1,8 +1,10 @@
 import { createHash } from 'crypto';
-import { readCompressedFile } from './compression.js';
-import { checkFileExists } from './fs-helpers.js';
+import { readCompressedFile, writeCompressedFile } from './compression.js';
+import { checkDirectoryExists, checkFileExists } from './fs-helpers.js';
 import { getObjectFromAnyPack } from './pack.js';
 import { isBinary } from 'istextorbinary';
+import { GitConfig } from './git-config.js';
+import { mkdir } from 'fs/promises';
 
 export type GitObjectType = 'commit' | 'tree' | 'blob' | 'tag';
 export const gitObjectTypes = ['commit', 'tree', 'blob', 'tag'];
@@ -24,6 +26,12 @@ export interface Commit {
     };
 }
 
+/**
+ * Get an object from a git repository
+ * @param repoPath The path to the .git folder
+ * @param sha The sha1 hash of the object
+ * @returns The header, content and type of the object
+ */
 export async function getObject(repoPath: string, sha: string) {
     const blobPath = `${repoPath}/objects/${sha.slice(0, 2)}/${sha.slice(2)}`;
     if (await checkFileExists(blobPath)) {
@@ -123,15 +131,46 @@ export function numToObjType(type: number) {
  * @param content The content of the object as a buffer
  * @returns The sha1 hash of the object
  */
-export function hashObject(type: GitObjectType, content: Buffer, fileName = '', filters = false) {
-    let hashContent: string | Buffer;
-    let length: number;
-    if (filters && !isBinary(fileName, content)) {
-        hashContent = content.toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        length = Buffer.byteLength(hashContent);
-    } else {
-        hashContent = content;
-        length = content.length;
-    }
+export function hashObject(type: GitObjectType, content: Buffer, config: GitConfig, fileName = '', filters = true) {
+    const { content: hashContent, length } = preProcessObject(content, config, fileName, filters);
     return createHash('sha1').update(`${type} ${length}\x00`).update(hashContent).digest('hex');
+}
+
+function fixLineEndings(content: string) {
+    return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+function preProcessObject(content: Buffer, config: GitConfig, fileName = '', filters = true) {
+    if ((filters && !isBinary(fileName, content) && config['core.autocrlf'] === 'true') || config['core.autocrlf'] === 'input') {
+        const hashContent = fixLineEndings(content.toString('utf8'));
+        return {
+            content: hashContent,
+            length: Buffer.byteLength(hashContent),
+        };
+    }
+    return {
+        content,
+        length: content.length,
+    };
+}
+
+export async function writeObject(
+    repoPath: string,
+    type: GitObjectType,
+    content: Buffer,
+    config: GitConfig,
+    fileName = '',
+    filters = false,
+) {
+    const { content: hashContent, length } = preProcessObject(content, config, fileName, filters);
+    const sha = createHash('sha1').update(`${type} ${length}\x00`).update(hashContent).digest('hex');
+    const objectDir = `${repoPath}/objects/${sha.slice(0, 2)}`;
+    const objectPath = `${objectDir}/${sha.slice(2)}`;
+
+    if (!checkDirectoryExists(objectPath)) {
+        await mkdir(objectDir, { recursive: true });
+    }
+
+    await writeCompressedFile(objectPath, Buffer.from(`${type} ${length}\x00${hashContent}`));
+    return sha;
 }

@@ -1,6 +1,6 @@
 import { readFile } from 'fs/promises';
 import { checkFileExists } from './fs-helpers.js';
-import { getCommit, getObject } from './object.js';
+import { GitObjectType, getCommit, getObject, hashObject, writeObject } from './object.js';
 import { parseIndexFile } from './staging.js';
 import { GitConfig, readMergedGitConfig } from './git-config.js';
 
@@ -120,7 +120,35 @@ export default class GitRepo {
         throw new Error('HEAD does not point to a branch or tag. This is not supported yet');
     }
 
+    /**
+     * Get the path of the repository
+     * @returns The path of the .git folder
+     */
     getPath() {
         return this.path;
+    }
+
+    /**
+     * Hash an object and write it to the object store
+     * @param type The type of the object (commit, tree, blob, tag)
+     * @param content The data of the object
+     * @param fileName The name of the file (optional)
+     * @param filters Run filters on the content (default: true)
+     * @returns The sha1 hash of the object
+     */
+    async hashObject(type: GitObjectType, content: Buffer, fileName = '', filters = true) {
+        return hashObject(type, content, await this.getConfig(), fileName, filters);
+    }
+
+    /**
+     * Write an object to the object store
+     * @param type The type of the object (commit, tree, blob, tag)
+     * @param content The data of the object
+     * @param fileName The name of the file (optional)
+     * @param filters Run filters on the content (default: true)
+     * @returns The sha1 hash of the object
+     */
+    async writeObject(type: GitObjectType, content: Buffer, fileName = '', filters = true) {
+        return await writeObject(this.path, type, content, await this.getConfig(), fileName, filters);
     }
 }

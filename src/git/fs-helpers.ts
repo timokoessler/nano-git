@@ -35,3 +35,16 @@ export async function checkFileExists(path: string) {
         return false;
     }
 }
+
+/**
+ * Check if a directory exists at the given path
+ * @param path The path to the directory
+ * @returns A promise that resolves to true if the directory exists, false otherwise
+ */
+export async function checkDirectoryExists(path: string) {
+    try {
+        return (await stat(path)).isDirectory();
+    } catch {
+        return false;
+    }
+}

@@ -1,7 +1,13 @@
 import { readFile } from 'fs/promises';
 import { checkFileExists } from './fs-helpers';
 
-export type GitConfig = Record<string, string>;
+export type GitConfig = Record<string, string> & {
+    'core.autocrlf'?: 'true' | 'false' | 'input';
+    'user.name'?: string;
+    'user.email'?: string;
+    'commit.gpgsign'?: 'true' | 'false';
+    'init.defaultBranch'?: string;
+};
 
 /**
  * Parse a git config file
