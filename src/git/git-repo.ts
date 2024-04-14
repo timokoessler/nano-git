@@ -2,32 +2,28 @@ import { readFile } from 'fs/promises';
 import { checkFileExists } from './fs-helpers.js';
 import { getCommit, getObject } from './object.js';
 import { parseIndexFile } from './staging.js';
-
-export interface Commit {
-    sha: string;
-    tree: string;
-    parents: string[];
-    message: string;
-    author: {
-        date: Date;
-        name: string;
-        email: string;
-    };
-    committer: {
-        date: Date;
-        name: string;
-        email: string;
-    };
-}
+import { GitConfig, readMergedGitConfig } from './git-config.js';
 
 /**
  * Class to interact with a git repository
  */
 export default class GitRepo {
     private path: string;
+    private config: GitConfig;
 
     constructor(path: string) {
         this.path = path;
+    }
+
+    /**
+     * Get the config of the repository
+     * @returns The config of the repository
+     */
+    async getConfig() {
+        if (this.config === undefined) {
+            this.config = await readMergedGitConfig(this.path);
+        }
+        return this.config;
     }
 
     /**
@@ -44,7 +40,7 @@ export default class GitRepo {
      * @param sha The sha1 hash of the commit object
      * @returns The commit object
      */
-    async getCommit(sha: string): Promise<Commit> {
+    async getCommit(sha: string) {
         return await getCommit(this.path, sha);
     }
 

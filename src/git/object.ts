@@ -7,6 +7,23 @@ import { isBinary } from 'istextorbinary';
 export type GitObjectType = 'commit' | 'tree' | 'blob' | 'tag';
 export const gitObjectTypes = ['commit', 'tree', 'blob', 'tag'];
 
+export interface Commit {
+    sha: string;
+    tree: string;
+    parents: string[];
+    message: string;
+    author: {
+        date: Date;
+        name: string;
+        email: string;
+    };
+    committer: {
+        date: Date;
+        name: string;
+        email: string;
+    };
+}
+
 export async function getObject(repoPath: string, sha: string) {
     const blobPath = `${repoPath}/objects/${sha.slice(0, 2)}/${sha.slice(2)}`;
     if (await checkFileExists(blobPath)) {
@@ -30,7 +47,7 @@ export async function getObject(repoPath: string, sha: string) {
     };
 }
 
-export async function getCommit(repoPath: string, sha: string) {
+export async function getCommit(repoPath: string, sha: string): Promise<Commit> {
     const obj = await getObject(repoPath, sha);
     if (obj.type !== 'commit') {
         throw new Error('Object is not a commit');

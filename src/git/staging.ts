@@ -71,6 +71,7 @@ export async function parseIndexFile(repoPath: string) {
 
         let nameStart = 62;
         if (version > 2 && extendedFlag !== 0) {
+            // Ignored for now
             // const skipWorktreeFlag = entry.readUInt16BE(62) & 0b0100000000000000;
             // const intentToAddFlag = entry.readUInt16BE(62) & 0b0010000000000000;
             nameStart += 2;
