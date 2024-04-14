@@ -14,13 +14,7 @@ export async function hashObjectCommand(path: string, options: { type: string; f
         exit(1);
     }
 
-    const content = await readFile(path, 'utf-8');
-
-    if (options.filters) {
-        const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        log(hashObject(type as GitObjectType, normalized));
-        exit(0);
-    }
-
-    log(hashObject(type as GitObjectType, content));
+    const content = await readFile(path);
+    const fileName = path.split('/').pop();
+    log(hashObject(type as GitObjectType, content, fileName, options.filters));
 }

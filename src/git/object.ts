@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { readCompressedFile } from './compression.js';
 import { checkFileExists } from './fs-helpers.js';
 import { getObjectFromAnyPack } from './pack.js';
+import { isBinary } from 'istextorbinary';
 
 export type GitObjectType = 'commit' | 'tree' | 'blob' | 'tag';
 export const gitObjectTypes = ['commit', 'tree', 'blob', 'tag'];
@@ -105,12 +106,15 @@ export function numToObjType(type: number) {
  * @param content The content of the object as a buffer
  * @returns The sha1 hash of the object
  */
-export function hashObject(type: GitObjectType, content: Buffer | string) {
+export function hashObject(type: GitObjectType, content: Buffer, fileName = '', filters = false) {
+    let hashContent: string | Buffer;
     let length: number;
-    if (Buffer.isBuffer(content)) {
-        length = content.length;
+    if (filters && !isBinary(fileName, content)) {
+        hashContent = content.toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        length = Buffer.byteLength(hashContent);
     } else {
-        length = Buffer.byteLength(content);
+        hashContent = content;
+        length = content.length;
     }
-    return createHash('sha1').update(`${type} ${length}\x00`).update(content).digest('hex');
+    return createHash('sha1').update(`${type} ${length}\x00`).update(hashContent).digest('hex');
 }
