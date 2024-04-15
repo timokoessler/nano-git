@@ -1,3 +1,4 @@
+import { warn } from 'console';
 import { readFile } from 'fs/promises';
 
 interface IndexEntry {
@@ -14,6 +15,14 @@ interface IndexEntry {
     gid: number;
     assumeValidFlag: boolean;
     stage: number;
+}
+
+interface CacheTreeEntry {
+    path: string;
+    entryCount: number;
+    subTreeCount: number;
+    sha: string;
+    subEntries: CacheTreeEntry[];
 }
 
 /**
@@ -104,5 +113,75 @@ export async function parseIndexFile(repoPath: string) {
         const padding = 8 - ((nameStart + nameLength) % 8);
         entryStart += nameStart + nameLength + padding;
     }
-    return entries;
+
+    let treeExtension: CacheTreeEntry;
+
+    // Parse extensions
+    let extensionStart = entryStart;
+    while (extensionStart < buf.length - 20) {
+        const extensionSignature = buf.subarray(extensionStart, extensionStart + 4).toString();
+        const extensionLength = buf.readUInt32BE(extensionStart + 4);
+        if (extensionSignature === 'TREE') {
+            treeExtension = parseTreeExtensionData(buf.subarray(extensionStart + 8, extensionStart + 8 + extensionLength));
+        } else {
+            warn(`Unsupported index extension with signature ${extensionSignature}`);
+        }
+        extensionStart += 8 + extensionLength;
+    }
+
+    return {
+        entries,
+        treeExtension,
+    };
+}
+
+function parseTreeExtensionData(extension: Buffer): CacheTreeEntry {
+    let entryStart = 0;
+
+    const entries: CacheTreeEntry[] = [];
+
+    while (entryStart < extension.length - 5) {
+        const entry = extension.subarray(entryStart);
+        const path = entry.subarray(0, entry.indexOf('\x00')).toString();
+        const spaceIndex = entry.indexOf(' ');
+        const entryCount = parseInt(entry.subarray(path.length + 1, spaceIndex).toString('ascii'));
+        if (isNaN(entryCount)) {
+            throw new Error('Invalid entry count in tree extension');
+        }
+
+        const newLineIndex = entry.indexOf('\n');
+
+        // If the entry count is -1 the entry is invalidated and the next entry starts after the new line character
+        if (entryCount === -1) {
+            entryStart += newLineIndex + 1;
+            continue;
+        }
+
+        const subTreeCount = parseInt(entry.subarray(spaceIndex + 1, newLineIndex).toString('ascii'));
+        if (isNaN(subTreeCount)) {
+            throw new Error('Invalid sub tree count in tree extension');
+        }
+        const sha = entry.subarray(newLineIndex + 1, newLineIndex + 21).toString('hex');
+
+        entries.push({
+            path,
+            sha,
+            entryCount,
+            subEntries: [],
+            subTreeCount,
+        });
+        entryStart += newLineIndex + 21;
+    }
+
+    if (entries.length === 0) {
+        throw new Error('No entries found in tree extension');
+    }
+
+    if (entries[0].path !== '') {
+        throw new Error('First entry in tree extension is not the root');
+    }
+
+    // Todo: Nest to tree structure
+
+    return entries[0];
 }
