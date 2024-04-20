@@ -1,6 +1,6 @@
 import { readFile } from 'fs/promises';
 import { checkFileExists } from './fs-helpers.js';
-import { GitObjectType, getCommit, getObject, hashObject, writeObject } from './object.js';
+import { GitObjectType, getCommit, getObject, getTree, hashObject, writeObject } from './object.js';
 import { parseIndexFile } from './staging.js';
 import { GitConfig, readMergedGitConfig } from './git-config.js';
 import { GitIgnoreParser } from './git-ignore.js';
@@ -52,16 +52,7 @@ export default class GitRepo {
      * @returns An array of objects with the mode, name and sha1 hash of the tree entries
      */
     async getTree(sha: string) {
-        const obj = await getObject(this.path, sha);
-        if (obj.type !== 'tree') {
-            throw new Error('Object is not a tree');
-        }
-        const lines = obj.content.toString().split('\n');
-        const entries = lines.map((line) => {
-            const [mode, type, name, sha] = line.split(' ');
-            return { mode, type, name, sha };
-        });
-        return entries;
+        return await getTree(this.path, sha);
     }
 
     /**

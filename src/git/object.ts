@@ -55,6 +55,12 @@ export async function getObject(repoPath: string, sha: string) {
     };
 }
 
+/**
+ * Get a commit object from a git repository
+ * @param repoPath The path to the .git folder
+ * @param sha  Hash of the commit object
+ * @returns A commit object
+ */
 export async function getCommit(repoPath: string, sha: string): Promise<Commit> {
     const obj = await getObject(repoPath, sha);
     if (obj.type !== 'commit') {
@@ -102,6 +108,34 @@ export async function getCommit(repoPath: string, sha: string): Promise<Commit> 
     const message = lines.slice(messageStart).join('\n');
 
     return { sha, tree, parents, message, author, committer };
+}
+
+/**
+ * Get a tree object from a git repository
+ * @param repoPath The path to the .git folder
+ * @param sha The sha1 hash of the tree object
+ * @returns An array of objects with the mode, name and sha1 hash of the tree entries
+ */
+export async function getTree(repoPath: string, sha: string) {
+    const obj = await getObject(repoPath, sha);
+    if (obj.type !== 'tree') {
+        throw new Error('Object is not a tree');
+    }
+    const entries: { mode: number; name: string; sha: string }[] = [];
+    let offset = 0;
+    while (offset < obj.content.length) {
+        const spacePos = obj.content.indexOf(32, offset);
+        const nullPos = obj.content.indexOf(0, spacePos);
+        if (nullPos === -1) {
+            throw new Error('Tree entry is malformed');
+        }
+        const mode = parseInt(obj.content.subarray(offset, spacePos).toString());
+        const name = obj.content.subarray(spacePos + 1, nullPos).toString();
+        const sha = obj.content.subarray(nullPos + 1, nullPos + 21).toString('hex');
+        entries.push({ mode, name, sha });
+        offset = nullPos + 21;
+    }
+    return entries;
 }
 
 export function numToObjType(type: number) {
