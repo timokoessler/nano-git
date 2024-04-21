@@ -29,6 +29,13 @@ export async function catFileCommand(hash: string, options: { type: boolean; siz
     } else if (options.size) {
         log(object.header.split(' ')[1]);
     } else if (options.pretty) {
+        if (object.type === 'tree') {
+            const tree = await repo.getTree(hash);
+            tree.forEach((entry) => {
+                log(`${entry.mode.toString().padStart(6, '0')} ${entry.sha} ${entry.name}`);
+            });
+            return;
+        }
         log(object.content.toString());
     }
 }
