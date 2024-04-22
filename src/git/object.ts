@@ -52,7 +52,7 @@ export async function getObject(repoPath: string, sha: string): Promise<GitObjec
         return { sha, header, content, type: header.split(' ')[0] as GitObjectType };
     }
     const packObject = await getObjectFromAnyPack(repoPath, sha);
-    if (packObject === null) {
+    if (!packObject) {
         throw new Error(`Object ${sha} not found`);
     }
     return {
@@ -61,6 +61,26 @@ export async function getObject(repoPath: string, sha: string): Promise<GitObjec
         content: packObject.data,
         type: packObject.type as GitObjectType,
     };
+}
+
+/**
+ * Parses a Commit / Tag line with user name, email and date
+ * @param line
+ * @returns Objekt with date, name and email
+ */
+function parseUserDateLine(line: string) {
+    const parts = line.split(' ');
+    const user = parts.slice(1, -2);
+    const email = user.pop()?.slice(1, -1);
+    if (email === undefined) {
+        throw new Error('Commit does not have an email');
+    }
+    const name = user.join(' ');
+
+    const timestamp = parseInt(parts[parts.length - 2]);
+    const date = new Date(timestamp * 1000);
+
+    return { date, name, email };
 }
 
 /**
@@ -82,21 +102,6 @@ export function parseCommit(commitObj: GitObject): Commit {
     if (!Array.isArray(parents)) {
         parents = [];
     }
-
-    const parseUserDateLine = (line: string) => {
-        const parts = line.split(' ');
-        const user = parts.slice(1, -2);
-        const email = user.pop()?.slice(1, -1);
-        if (email === undefined) {
-            throw new Error('Commit does not have an email');
-        }
-        const name = user.join(' ');
-
-        const timestamp = parseInt(parts[parts.length - 2]);
-        const date = new Date(timestamp * 1000);
-
-        return { date, name, email };
-    };
 
     const authorLine = lines.find((line) => line.startsWith('author'));
     if (authorLine === undefined) {
@@ -160,6 +165,48 @@ export function parseTree(treeObj: GitObject) {
  */
 export async function getTree(repoPath: string, sha: string) {
     return parseTree(await getObject(repoPath, sha));
+}
+
+/**
+ * Parse a Git Object as a tag
+ * @param tagObj Git Object to parse
+ * @returns An object with the sha1 hash of the tagged object, the message and the tagger
+ */
+export function parseTag(tagObj: GitObject) {
+    if (tagObj.type !== 'tag') {
+        throw new Error('Object is not a tag');
+    }
+    const lines = tagObj.content.toString().split('\n');
+    const object = lines.find((line) => line.startsWith('object'))?.split(' ')[1];
+    if (object === undefined) {
+        throw new Error('Tag does not have an object');
+    }
+    const type = lines.find((line) => line.startsWith('type'))?.split(' ')[1];
+    if (type === undefined) {
+        throw new Error('Tag does not have a type');
+    }
+    const tag = lines.find((line) => line.startsWith('tag'))?.split(' ')[1];
+    if (tag === undefined) {
+        throw new Error('Tag does not have a tag');
+    }
+    const taggerLine = lines.find((line) => line.startsWith('tagger'));
+    if (taggerLine === undefined) {
+        throw new Error('Tag does not have a tagger');
+    }
+    const messageStart = lines.findIndex((line) => line === '') + 1;
+    const message = lines.slice(messageStart).join('\n');
+    const tagger = parseUserDateLine(taggerLine);
+    return { sha: tagObj.sha, object, type, tag, tagger, message };
+}
+
+/**
+ * Get a tag object from a git repository
+ * @param repoPath The path to the .git folder
+ * @param sha The sha1 hash of the tag object
+ * @returns An object with the sha1 hash of the tagged object, the message and the tagger
+ */
+export async function getTag(repoPath: string, sha: string) {
+    return parseTag(await getObject(repoPath, sha));
 }
 
 export function numToObjType(type: number) {
