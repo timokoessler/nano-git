@@ -3,6 +3,13 @@ import { checkFileExists } from './fs-helpers.js';
 import { numToObjType } from './object.js';
 import { decompressObject } from './compression.js';
 
+/**
+ * Search for an specific object in a pack index file
+ * @param repoPath The path to the .git folder
+ * @param packSha The sha1 hash of the pack file
+ * @param sha The sha1 hash of the object
+ * @returns The crc32 checksum and the offset of the object in the pack file or undefined if the object was not found
+ */
 export async function findObjectInPackIndex(repoPath: string, packSha: string, sha: string) {
     const indexFile = `${repoPath}/objects/pack/pack-${packSha}.idx`;
     if (!(await checkFileExists(indexFile))) {
@@ -52,7 +59,7 @@ export async function findObjectInPackIndex(repoPath: string, packSha: string, s
         }
     }
     if (startOffset >= endOffset) {
-        return null;
+        return undefined;
     }
 
     const index = (startOffset - offset) / sha1Length;
@@ -75,6 +82,13 @@ export async function findObjectInPackIndex(repoPath: string, packSha: string, s
     };
 }
 
+/**
+ * Extract an object from a pack file
+ * @param repoPath The path to the .git folder
+ * @param packSha The sha1 hash of the pack file
+ * @param index The crc32 checksum and the offset of the object in the pack file
+ * @returns
+ */
 export async function getObjectFromPack(repoPath: string, packSha: string, index: { crc32Checksum: number; dataOffset: number }) {
     const packFile = `${repoPath}/objects/pack/pack-${packSha}.pack`;
     if (!(await checkFileExists(packFile))) {
@@ -121,6 +135,8 @@ export async function getObjectFromPack(repoPath: string, packSha: string, index
         throw new Error('Delta objects are not supported yet');
     }
 
+    // Todo check checksum
+
     const { size, typeAndSizeLength } = parseVarSize(index.dataOffset);
 
     return {
@@ -130,20 +146,31 @@ export async function getObjectFromPack(repoPath: string, packSha: string, index
     };
 }
 
+/**
+ * Get all pack file names of a git repository
+ * @param repoPath The path to the .git folder
+ * @returns An array with the names of all pack files including the extension
+ */
 async function getAllPackFileNames(repoPath: string) {
     const packDir = `${repoPath}/objects/pack`;
     const files = await readdir(packDir);
     return files.filter((file) => file.endsWith('.pack'));
 }
 
+/**
+ * Find an object in any pack file of a git repository
+ * @param repoPath The path to the .git folder
+ * @param sha The sha1 hash of the object
+ * @returns The object or undefined if it was not found
+ */
 export async function getObjectFromAnyPack(repoPath: string, sha: string) {
     const packFiles = await getAllPackFileNames(repoPath);
     for (const packFile of packFiles) {
         const packSha = packFile.split('-')[1].split('.')[0];
         const indexInfo = await findObjectInPackIndex(repoPath, packSha, sha);
-        if (indexInfo !== null) {
+        if (indexInfo) {
             return await getObjectFromPack(repoPath, packSha, indexInfo);
         }
     }
-    return null;
+    return undefined;
 }

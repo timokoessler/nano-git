@@ -26,13 +26,20 @@ export interface Commit {
     };
 }
 
+export interface GitObject {
+    sha: string;
+    header: string;
+    content: Buffer;
+    type: GitObjectType;
+}
+
 /**
  * Get an object from a git repository
  * @param repoPath The path to the .git folder
  * @param sha The sha1 hash of the object
  * @returns The header, content and type of the object
  */
-export async function getObject(repoPath: string, sha: string) {
+export async function getObject(repoPath: string, sha: string): Promise<GitObject> {
     const blobPath = `${repoPath}/objects/${sha.slice(0, 2)}/${sha.slice(2)}`;
     if (await checkFileExists(blobPath)) {
         const buf = await readCompressedFile(blobPath);
@@ -42,31 +49,30 @@ export async function getObject(repoPath: string, sha: string) {
         }
         const header = buf.subarray(0, headerEnd).toString();
         const content = buf.subarray(headerEnd + 1);
-        return { header, content, type: header.split(' ')[0] };
+        return { sha, header, content, type: header.split(' ')[0] as GitObjectType };
     }
     const packObject = await getObjectFromAnyPack(repoPath, sha);
     if (packObject === null) {
         throw new Error(`Object ${sha} not found`);
     }
     return {
+        sha,
         header: `${packObject.type} ${packObject.size}\x00`,
         content: packObject.data,
-        type: packObject.type,
+        type: packObject.type as GitObjectType,
     };
 }
 
 /**
- * Get a commit object from a git repository
- * @param repoPath The path to the .git folder
- * @param sha  Hash of the commit object
+ * Parse a Git Object as a commit
+ * @param commitObj Git Object to parse
  * @returns A commit object
  */
-export async function getCommit(repoPath: string, sha: string): Promise<Commit> {
-    const obj = await getObject(repoPath, sha);
-    if (obj.type !== 'commit') {
+export function parseCommit(commitObj: GitObject): Commit {
+    if (commitObj.type !== 'commit') {
         throw new Error('Object is not a commit');
     }
-    const lines = obj.content.toString().split('\n');
+    const lines = commitObj.content.toString().split('\n');
 
     const tree = lines.find((line) => line.startsWith('tree'))?.split(' ')[1];
     if (tree === undefined) {
@@ -107,7 +113,43 @@ export async function getCommit(repoPath: string, sha: string): Promise<Commit> 
     const messageStart = lines.findIndex((line) => line === '') + 1;
     const message = lines.slice(messageStart).join('\n');
 
-    return { sha, tree, parents, message, author, committer };
+    return { sha: commitObj.sha, tree, parents, message, author, committer };
+}
+
+/**
+ * Get a commit object from a git repository
+ * @param repoPath The path to the .git folder
+ * @param sha  Hash of the commit object
+ * @returns A commit object
+ */
+export async function getCommit(repoPath: string, sha: string): Promise<Commit> {
+    return parseCommit(await getObject(repoPath, sha));
+}
+
+/**
+ * Parse a Git Object as a tree
+ * @param treeObj Git Object to parse
+ * @returns An array of objects with the mode, name and sha1 hash of the tree entries
+ */
+export function parseTree(treeObj: GitObject) {
+    if (treeObj.type !== 'tree') {
+        throw new Error('Object is not a tree');
+    }
+    const entries: { mode: number; name: string; sha: string }[] = [];
+    let offset = 0;
+    while (offset < treeObj.content.length) {
+        const spacePos = treeObj.content.indexOf(32, offset);
+        const nullPos = treeObj.content.indexOf(0, spacePos);
+        if (nullPos === -1) {
+            throw new Error('Tree entry is malformed');
+        }
+        const mode = parseInt(treeObj.content.subarray(offset, spacePos).toString());
+        const name = treeObj.content.subarray(spacePos + 1, nullPos).toString();
+        const sha = treeObj.content.subarray(nullPos + 1, nullPos + 21).toString('hex');
+        entries.push({ mode, name, sha });
+        offset = nullPos + 21;
+    }
+    return entries;
 }
 
 /**
@@ -117,25 +159,7 @@ export async function getCommit(repoPath: string, sha: string): Promise<Commit> 
  * @returns An array of objects with the mode, name and sha1 hash of the tree entries
  */
 export async function getTree(repoPath: string, sha: string) {
-    const obj = await getObject(repoPath, sha);
-    if (obj.type !== 'tree') {
-        throw new Error('Object is not a tree');
-    }
-    const entries: { mode: number; name: string; sha: string }[] = [];
-    let offset = 0;
-    while (offset < obj.content.length) {
-        const spacePos = obj.content.indexOf(32, offset);
-        const nullPos = obj.content.indexOf(0, spacePos);
-        if (nullPos === -1) {
-            throw new Error('Tree entry is malformed');
-        }
-        const mode = parseInt(obj.content.subarray(offset, spacePos).toString());
-        const name = obj.content.subarray(spacePos + 1, nullPos).toString();
-        const sha = obj.content.subarray(nullPos + 1, nullPos + 21).toString('hex');
-        entries.push({ mode, name, sha });
-        offset = nullPos + 21;
-    }
-    return entries;
+    return parseTree(await getObject(repoPath, sha));
 }
 
 export function numToObjType(type: number) {
@@ -170,10 +194,22 @@ export function hashObject(type: GitObjectType, content: Buffer, config: GitConf
     return createHash('sha1').update(`${type} ${length}\x00`).update(hashContent).digest('hex');
 }
 
+/**
+ * Replace Windows line endings with Unix line endings
+ * @param content The content to modify
+ */
 function fixLineEndings(content: string) {
     return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
 
+/**
+ * Preprocess an object before writing it to the object database or hashing it
+ * @param content The content of the object
+ * @param config The git configuration object
+ * @param fileName A optional file name to use for binary detection
+ * @param filters Whether to apply filters to the content (e.g. autocrlf)
+ * @returns The processed content and its length
+ */
 function preProcessObject(content: Buffer, config: GitConfig, fileName = '', filters = true) {
     if ((filters && !isBinary(fileName, content) && config['core.autocrlf'] === 'true') || config['core.autocrlf'] === 'input') {
         const hashContent = fixLineEndings(content.toString('utf8'));
@@ -188,6 +224,16 @@ function preProcessObject(content: Buffer, config: GitConfig, fileName = '', fil
     };
 }
 
+/**
+ * Write an object to the object database of a git repository
+ * @param repoPath The path to the .git folder
+ * @param type The type of the object
+ * @param content The content of the object
+ * @param config The git configuration object
+ * @param fileName A optional file name to use for binary detection
+ * @param filters Whether to apply filters to the content (e.g. autocrlf)
+ * @returns The sha1 hash of the created object
+ */
 export async function writeObject(
     repoPath: string,
     type: GitObjectType,

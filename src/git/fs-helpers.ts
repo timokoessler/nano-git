@@ -1,6 +1,10 @@
 import { access, constants, stat } from 'node:fs/promises';
 import path from 'node:path';
 
+/**
+ * Find the .git folder in the current directory or any of its parent directories
+ * @returns A promise that resolves to the path of the .git folder or undefined if it was not found
+ */
 export async function findGitFolder(): Promise<string | undefined> {
     let currentPath = process.cwd();
 

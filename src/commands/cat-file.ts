@@ -2,6 +2,7 @@ import { error, log } from 'console';
 import GitRepo from '../git/git-repo';
 import { findGitFolder } from '../git/fs-helpers';
 import { exit } from 'process';
+import { parseTree } from '../git/object';
 
 export async function catFileCommand(hash: string, options: { type: boolean; size: boolean; pretty: boolean }) {
     const folder = await findGitFolder();
@@ -30,7 +31,7 @@ export async function catFileCommand(hash: string, options: { type: boolean; siz
         log(object.header.split(' ')[1]);
     } else if (options.pretty) {
         if (object.type === 'tree') {
-            const tree = await repo.getTree(hash);
+            const tree = parseTree(object);
             tree.forEach((entry) => {
                 log(`${entry.mode.toString().padStart(6, '0')} ${entry.sha} ${entry.name}`);
             });

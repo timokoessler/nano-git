@@ -47,7 +47,7 @@ async function parseGitConfig(path: string) {
  * Parse the global (per-user) git config
  * @returns An object with the global git config values
  */
-export async function parseGlobalGitConfig() {
+async function parseGlobalGitConfig() {
     const home = process.env.HOME || process.env.USERPROFILE;
     if (home === undefined) {
         throw new Error('Error parsing global git config: HOME or USERPROFILE environment variable is not set');
@@ -66,6 +66,11 @@ function mergeGitConfigs(globalConfig: GitConfig, localConfig: GitConfig) {
     return Object.assign({}, globalConfig, localConfig);
 }
 
+/**
+ * Get a git config object with the merged global and local config settings
+ * @param repoPath Path to the git repository (.git folder)
+ * @returns A promise that resolves to the merged git config object
+ */
 export async function readMergedGitConfig(repoPath: string) {
     return mergeGitConfigs(await parseGlobalGitConfig(), await parseGitConfig(`${repoPath}/config`));
 }
