@@ -1,6 +1,6 @@
 import { readFile } from 'fs/promises';
 import { checkFileExists } from './fs-helpers.js';
-import { GitObjectType, getCommit, getObject, getTree, hashObject, writeObject } from './object.js';
+import { GitObjectType, getCommit, getObject, getTree, hashObject, writeObject, isHash } from './object.js';
 import { parseIndexFile } from './staging.js';
 import { GitConfig, readMergedGitConfig } from './git-config.js';
 import { GitIgnoreParser } from './git-ignore.js';
@@ -93,7 +93,10 @@ export default class GitRepo {
         return this.getRef(`heads/${name}`);
     }
 
-    // Todo: Support more types of references and detached HEAD
+    /**
+     * Get the current commit of the repository
+     * @returns
+     */
     async getHead() {
         const content = (await readFile(`${this.path}/HEAD`)).toString().trim();
         if (content.startsWith('ref: refs/heads/')) {
@@ -110,7 +113,18 @@ export default class GitRepo {
                 commit: await this.getRef(content.slice(5)),
             };
         }
-        throw new Error('HEAD does not point to a branch or tag. This is not supported yet');
+        if (isHash(content)) {
+            const type = (await this.getObject(content)).type;
+            if (type === 'commit') {
+                return {
+                    type: 'commit',
+                    name: content,
+                    commit: content,
+                };
+            }
+            throw new Error(`HEAD points to invalid object type: ${type}`);
+        }
+        throw new Error(`Invalid HEAD file: ${content}`);
     }
 
     /**

@@ -301,3 +301,12 @@ export async function writeObject(
     await writeCompressedFile(objectPath, Buffer.from(`${type} ${length}\x00${hashContent}`));
     return sha;
 }
+
+/**
+ * Check if a string is a valid sha1 hash
+ * @param hash The string to check
+ * @returns True if the string is a valid sha1 hash, false otherwise
+ */
+export function isHash(hash: string) {
+    return /^[0-9a-f]{40}$/.test(hash);
+}
