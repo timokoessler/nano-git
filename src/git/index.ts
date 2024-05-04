@@ -122,7 +122,7 @@ export async function parseIndexFile(repoPath: string) {
         const extensionSignature = buf.subarray(extensionStart, extensionStart + 4).toString();
         const extensionLength = buf.readUInt32BE(extensionStart + 4);
         if (extensionSignature === 'TREE') {
-            treeExtension = parseTreeExtensionData(buf.subarray(extensionStart + 8, extensionStart + 8 + extensionLength));
+            //treeExtension = parseTreeExtensionData(buf.subarray(extensionStart + 8, extensionStart + 8 + extensionLength));
         } else {
             warn(`Unsupported index extension with signature ${extensionSignature}`);
         }

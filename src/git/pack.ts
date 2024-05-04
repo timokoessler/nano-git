@@ -38,6 +38,7 @@ export async function findObjectInPackIndex(repoPath: string, packSha: string, s
         offset += 4;
     }
 
+    //  Decimal value of the first byte of the object hash
     const prefixNumber = parseInt(sha.substring(0, 2), 16);
     const sha1Length = 20; // bytes
 

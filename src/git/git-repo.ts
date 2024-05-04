@@ -1,7 +1,7 @@
 import { readFile } from 'fs/promises';
 import { checkFileExists } from './fs-helpers.js';
 import { GitObjectType, getCommit, getObject, getTree, hashObject, writeObject, isHash } from './object.js';
-import { parseIndexFile } from './staging.js';
+import { parseIndexFile } from './index.js';
 import { GitConfig, readMergedGitConfig } from './git-config.js';
 import { GitIgnoreParser } from './git-ignore.js';
 
