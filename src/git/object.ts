@@ -33,6 +33,11 @@ export interface GitObject {
     type: GitObjectType;
 }
 
+export interface Tree {
+    sha: string;
+    entries: { mode: number; name: string; sha: string }[];
+}
+
 /**
  * Get an object from a git repository
  * @param repoPath The path to the .git folder
@@ -136,7 +141,7 @@ export async function getCommit(repoPath: string, sha: string): Promise<Commit> 
  * @param treeObj Git Object to parse
  * @returns An array of objects with the mode, name and sha1 hash of the tree entries
  */
-export function parseTree(treeObj: GitObject) {
+export function parseTree(treeObj: GitObject): Tree {
     if (treeObj.type !== 'tree') {
         throw new Error('Object is not a tree');
     }
@@ -154,7 +159,7 @@ export function parseTree(treeObj: GitObject) {
         entries.push({ mode, name, sha });
         offset = nullPos + 21;
     }
-    return entries;
+    return { sha: treeObj.sha, entries };
 }
 
 /**

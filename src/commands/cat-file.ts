@@ -32,7 +32,7 @@ export async function catFileCommand(hash: string, options: { type: boolean; siz
     } else if (options.pretty) {
         if (object.type === 'tree') {
             const tree = parseTree(object);
-            tree.forEach((entry) => {
+            tree.entries.forEach((entry) => {
                 log(`${entry.mode.toString().padStart(6, '0')} ${entry.sha} ${entry.name}`);
             });
             return;

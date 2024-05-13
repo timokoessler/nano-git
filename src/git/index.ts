@@ -1,5 +1,11 @@
 import { warn } from 'console';
 import { readFile } from 'fs/promises';
+import { GitObject, Tree, getObject, getTree } from './object';
+
+export interface GitIndex {
+    entries: IndexEntry[];
+    treeExtension: CacheTreeEntry;
+}
 
 interface IndexEntry {
     name: string;
@@ -31,7 +37,7 @@ interface CacheTreeEntry {
  * @param repoPath Path to the .git folder
  * @returns An array of index entries
  */
-export async function parseIndexFile(repoPath: string) {
+export async function parseIndexFile(repoPath: string): Promise<GitIndex> {
     const buf = await readFile(`${repoPath}/index`);
 
     if (buf.subarray(0, 4).toString() !== 'DIRC') {
@@ -122,6 +128,7 @@ export async function parseIndexFile(repoPath: string) {
         const extensionSignature = buf.subarray(extensionStart, extensionStart + 4).toString();
         const extensionLength = buf.readUInt32BE(extensionStart + 4);
         if (extensionSignature === 'TREE') {
+            // Disabled for now because it seems not to work if files are staged?
             //treeExtension = parseTreeExtensionData(buf.subarray(extensionStart + 8, extensionStart + 8 + extensionLength));
         } else {
             warn(`Unsupported index extension with signature ${extensionSignature}`);
@@ -184,4 +191,37 @@ function parseTreeExtensionData(extension: Buffer): CacheTreeEntry {
     // Todo: Nest to tree structure
 
     return entries[0];
+}
+
+interface WorkingDirFileStatus {
+    name: string;
+    hash: string;
+    status: 'staged' | 'modified' | 'untracked';
+}
+
+export async function getWorkingDirStatus(repoPath: string, index: GitIndex, tree: Tree): Promise<WorkingDirFileStatus[]> {
+    const changes: WorkingDirFileStatus[] = [];
+
+    const treeEntries = Object.assign([], tree.entries);
+    for (const treeEntry of treeEntries) {
+        if (treeEntry.mode === 0o040000) {
+            treeEntries.push(...(await getTree(repoPath, treeEntry.sha)).entries);
+            continue;
+        }
+    }
+
+    for (const entry of index.entries) {
+        const existing = treeEntries.find((treeEntry) => treeEntry.name === entry.name);
+        console.log(existing);
+        if (existing === undefined || existing.sha !== entry.sha) {
+            changes.push({
+                name: entry.name,
+                hash: entry.sha,
+                status: 'staged',
+            });
+            continue;
+        }
+    }
+
+    return changes;
 }

@@ -1,7 +1,7 @@
 import { readFile } from 'fs/promises';
 import { checkFileExists } from './fs-helpers.js';
-import { GitObjectType, getCommit, getObject, getTree, hashObject, writeObject, isHash } from './object.js';
-import { parseIndexFile } from './index.js';
+import { GitObjectType, getCommit, getObject, getTree, hashObject, writeObject, isHash, Tree } from './object.js';
+import { GitIndex, getWorkingDirStatus, parseIndexFile } from './index.js';
 import { GitConfig, readMergedGitConfig } from './git-config.js';
 import { GitIgnoreParser } from './git-ignore.js';
 
@@ -171,5 +171,14 @@ export default class GitRepo {
             await this.gitignore.init();
         }
         return this.gitignore;
+    }
+
+    /**
+     * Get the status of the working directory
+     * @param index
+     * @returns
+     */
+    async getWorkingDirStatus(index: GitIndex, tree: Tree) {
+        return await getWorkingDirStatus(this.path, index, tree);
     }
 }
