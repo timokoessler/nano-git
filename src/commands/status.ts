@@ -15,7 +15,18 @@ export async function statusCommand() {
 
     log(`On ${head.type} ${head.name}`);
 
-    // log(await repo.getIndex());
+    const index = await repo.getIndex();
+    const lastCommit = await repo.getCommit(head.commit);
+    const rootTree = await repo.getTree(lastCommit.tree);
+    const changes = await repo.getWorkingDirStatus(index, rootTree);
+
+    const stagedChanges = changes.filter((change) => change.status === 'staged');
+    if (stagedChanges.length > 0) {
+        log('\nChanges to be committed:');
+        for (const change of stagedChanges) {
+            log(`  ${change.stagingStatus}:  ${change.name}`);
+        }
+    }
 
     // Todo print:
     // - Is up to date with remote

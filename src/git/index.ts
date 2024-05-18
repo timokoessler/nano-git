@@ -1,6 +1,8 @@
 import { warn } from 'console';
-import { readFile } from 'fs/promises';
-import { GitObject, Tree, getObject, getTree } from './object';
+import { readFile, readdir } from 'fs/promises';
+import { Tree, getTree } from './object';
+import { GitIgnoreParser } from './git-ignore';
+import { relative, resolve } from 'path';
 
 export interface GitIndex {
     entries: IndexEntry[];
@@ -197,31 +199,68 @@ interface WorkingDirFileStatus {
     name: string;
     hash: string;
     status: 'staged' | 'modified' | 'untracked';
+    stagingStatus?: 'added' | 'modified' | 'deleted';
 }
 
-export async function getWorkingDirStatus(repoPath: string, index: GitIndex, tree: Tree): Promise<WorkingDirFileStatus[]> {
-    const changes: WorkingDirFileStatus[] = [];
-
-    const treeEntries = Object.assign([], tree.entries);
-    for (const treeEntry of treeEntries) {
-        if (treeEntry.mode === 0o040000) {
-            treeEntries.push(...(await getTree(repoPath, treeEntry.sha)).entries);
+async function getAllTreeObjects(repoPath: string, tree: Tree, result: { mode: number; name: string; sha: string }[], path: string = '') {
+    for (const entry of tree.entries) {
+        if (entry.mode === 40000) {
+            await getAllTreeObjects(repoPath, await getTree(repoPath, entry.sha), result, `${path}${entry.name}/`);
             continue;
         }
+        result.push({ mode: entry.mode, name: `${path}${entry.name}`, sha: entry.sha });
     }
+}
+
+export async function getWorkingDirStatus(
+    repoPath: string,
+    index: GitIndex,
+    rootTree: Tree,
+    ignoreParser: GitIgnoreParser,
+): Promise<WorkingDirFileStatus[]> {
+    const changes: WorkingDirFileStatus[] = [];
+
+    const treeEntries: { mode: number; name: string; sha: string }[] = [];
+
+    await getAllTreeObjects(repoPath, rootTree, treeEntries);
 
     for (const entry of index.entries) {
         const existing = treeEntries.find((treeEntry) => treeEntry.name === entry.name);
-        console.log(existing);
         if (existing === undefined || existing.sha !== entry.sha) {
             changes.push({
                 name: entry.name,
                 hash: entry.sha,
                 status: 'staged',
+                stagingStatus: existing === undefined ? 'added' : 'modified',
             });
             continue;
         }
     }
 
+    // console.log(await getAllNonIgnoredFiles(repoPath, ignoreParser));
+
     return changes;
+}
+
+async function getAllNonIgnoredFiles(repoPath: string, ignoreParser: GitIgnoreParser): Promise<string[]> {
+    const rootDir = resolve(repoPath, '..');
+    const dirs = [rootDir];
+    const files: string[] = [];
+
+    while (dirs.length > 0) {
+        const dir = dirs.pop();
+        const entries = await readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            if (entry.isDirectory()) {
+                if (!ignoreParser.isIgnored(entry.name)) {
+                    dirs.push(resolve(dir, entry.name));
+                }
+            } else if (entry.isFile()) {
+                if (!ignoreParser.isIgnored(entry.name)) {
+                    files.push(entry.name);
+                }
+            }
+        }
+    }
+    return files;
 }

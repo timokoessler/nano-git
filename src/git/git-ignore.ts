@@ -10,6 +10,7 @@ export class GitIgnoreParser {
     constructor(repoPath: string, ignoreCase: boolean = false) {
         this.repoRoot = resolve(repoPath, '..');
         this.ignore = ignore({ ignoreCase });
+        this.ignore.add('.git');
     }
 
     /**
