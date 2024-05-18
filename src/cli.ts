@@ -5,6 +5,7 @@ import { catFileCommand } from './commands/cat-file';
 import { hashObjectCommand } from './commands/hash-object';
 import { checkIgnoreCommand } from './commands/check-ignore';
 import { lsFilesCommand } from './commands/ls-files';
+import { lsTreeCommand } from './commands/ls-tree';
 
 program.name('ngit').version('0.1.0').description('A minimal Git implementation for educational purposes');
 
@@ -34,6 +35,13 @@ program
     .argument('<file>', 'The path to the file')
     .action(checkIgnoreCommand);
 
-program.command('ls-files').description(' Show information about files in the index and the working tree').action(lsFilesCommand);
+program.command('ls-files').description('Show information about files in the index and the working tree').action(lsFilesCommand);
+
+program
+    .command('ls-tree')
+    .description('List the contents of a tree object')
+    .argument('<hash>', 'The hash of the tree')
+    .option('-r, --recursive', 'Recurse into subtrees', false)
+    .action(lsTreeCommand);
 
 program.parse();
