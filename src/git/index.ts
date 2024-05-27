@@ -2,7 +2,7 @@ import { warn } from 'console';
 import { readFile, readdir } from 'fs/promises';
 import { Tree, getTree } from './object';
 import { GitIgnoreParser } from './git-ignore';
-import { relative, resolve } from 'path';
+import { resolve } from 'path';
 
 export interface GitIndex {
     entries: IndexEntry[];
@@ -144,7 +144,7 @@ export async function parseIndexFile(repoPath: string): Promise<GitIndex> {
     };
 }
 
-function parseTreeExtensionData(extension: Buffer): CacheTreeEntry {
+/*function parseTreeExtensionData(extension: Buffer): CacheTreeEntry {
     let entryStart = 0;
 
     const entries: CacheTreeEntry[] = [];
@@ -193,7 +193,7 @@ function parseTreeExtensionData(extension: Buffer): CacheTreeEntry {
     // Todo: Nest to tree structure
 
     return entries[0];
-}
+}*/
 
 interface WorkingDirFileStatus {
     name: string;
@@ -237,7 +237,17 @@ export async function getWorkingDirStatus(
         }
     }
 
-    // console.log(await getAllNonIgnoredFiles(repoPath, ignoreParser));
+    const nonIgnoredFiles = await getAllNonIgnoredFiles(repoPath, ignoreParser);
+
+    for (const file of nonIgnoredFiles) {
+        if (!treeEntries.some((entry) => entry.name === file)) {
+            changes.push({
+                name: file,
+                hash: '',
+                status: 'untracked',
+            });
+        }
+    }
 
     return changes;
 }
@@ -257,7 +267,8 @@ async function getAllNonIgnoredFiles(repoPath: string, ignoreParser: GitIgnorePa
                 }
             } else if (entry.isFile()) {
                 if (!ignoreParser.isIgnored(entry.name)) {
-                    files.push(entry.name);
+                    const normalizedDir = dir.slice(rootDir.length + 1).replace(/\\/g, '/');
+                    files.push(`${normalizedDir.length ? `${normalizedDir}/` : ''}${entry.name}`);
                 }
             }
         }

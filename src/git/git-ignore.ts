@@ -34,7 +34,7 @@ export class GitIgnoreParser {
                 } else if (entry.isFile() && entry.name === '.gitignore') {
                     const content = await readFile(resolve(dir, entry.name), 'utf8');
                     const relativePath = relative(this.repoRoot, dir);
-                    this.ignore.add(content.split(/\r?\n/).map((line) => `${relativePath}/${line}`));
+                    this.ignore.add(content.split(/\r?\n/).map((line) => `${relativePath}/${line.replace(/^\/+/, '')}`));
                 }
             }
         }

@@ -28,6 +28,14 @@ export async function statusCommand() {
         }
     }
 
+    const untrackedFiles = changes.filter((change) => change.status === 'untracked');
+    if (untrackedFiles.length > 0) {
+        log('\nUntracked files:');
+        for (const file of untrackedFiles) {
+            log(`  ${file.name}`);
+        }
+    }
+
     // Todo print:
     // - Is up to date with remote
     // - Changes to be committed
