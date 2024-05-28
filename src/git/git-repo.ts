@@ -179,6 +179,6 @@ export default class GitRepo {
      * @returns
      */
     async getWorkingDirStatus(index: GitIndex, tree: Tree) {
-        return await getWorkingDirStatus(this.path, index, tree, await this.getGitIgnoreParser());
+        return await getWorkingDirStatus(this.path, index, tree, await this.getGitIgnoreParser(), await this.getConfig());
     }
 }

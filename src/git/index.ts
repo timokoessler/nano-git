@@ -1,8 +1,9 @@
 import { warn } from 'console';
 import { readFile, readdir } from 'fs/promises';
-import { Tree, getTree } from './object';
+import { Tree, getTree, hashObject } from './object';
 import { GitIgnoreParser } from './git-ignore';
 import { resolve } from 'path';
+import { GitConfig } from './git-config';
 
 export interface GitIndex {
     entries: IndexEntry[];
@@ -217,6 +218,7 @@ export async function getWorkingDirStatus(
     index: GitIndex,
     rootTree: Tree,
     ignoreParser: GitIgnoreParser,
+    config: GitConfig,
 ): Promise<WorkingDirFileStatus[]> {
     const changes: WorkingDirFileStatus[] = [];
 
@@ -238,7 +240,6 @@ export async function getWorkingDirStatus(
     }
 
     const nonIgnoredFiles = await getAllNonIgnoredFiles(repoPath, ignoreParser);
-
     for (const file of nonIgnoredFiles) {
         if (!treeEntries.some((entry) => entry.name === file)) {
             changes.push({
@@ -246,6 +247,20 @@ export async function getWorkingDirStatus(
                 hash: '',
                 status: 'untracked',
             });
+        } else {
+            const indexEntry = index.entries.find((entry) => entry.name === file);
+            if (indexEntry === undefined) {
+                throw new Error('Index entry not found');
+            }
+            const fileContent = await readFile(file);
+            const hash = hashObject('blob', fileContent, config, file);
+            if (hash !== indexEntry.sha) {
+                changes.push({
+                    name: file,
+                    hash,
+                    status: 'modified',
+                });
+            }
         }
     }
 

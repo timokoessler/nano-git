@@ -20,6 +20,9 @@ export async function statusCommand() {
     const rootTree = await repo.getTree(lastCommit.tree);
     const changes = await repo.getWorkingDirStatus(index, rootTree);
 
+    // Todo print:
+    // - Is up to date with remote
+
     const stagedChanges = changes.filter((change) => change.status === 'staged');
     if (stagedChanges.length > 0) {
         log('\nChanges to be committed:');
@@ -36,9 +39,11 @@ export async function statusCommand() {
         }
     }
 
-    // Todo print:
-    // - Is up to date with remote
-    // - Changes to be committed
-    // - Changes not staged for commit
-    // - Untracked files
+    const modifiedFiles = changes.filter((change) => change.status === 'modified');
+    if (modifiedFiles.length > 0) {
+        log('\nChanges not staged for commit:');
+        for (const file of modifiedFiles) {
+            log(`  modified:  ${file.name}`);
+        }
+    }
 }
