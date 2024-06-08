@@ -57,7 +57,7 @@ export default class GitRepo {
 
     /**
      * Get the index of the repository
-     * @returns Todo: Add return type
+     * @returns Returns a GitIndex object
      */
     async getIndex() {
         return await parseIndexFile(this.path);
